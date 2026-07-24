@@ -16,7 +16,15 @@ def fetch_gupy_job(url: str) -> dict:
     else:
         raise ValueError("Data not found in the HTML content")
 
+def clean_job_data(job: dict) -> dict:
+    return {
+        "titulo": job.get("name"),
+        "pre_requisitos": job.get("prerequisites"),
+        "responsabilidades": job.get("responsibilities"),
+    }
+
 if __name__ == "__main__":
     url =  input("Enter the Gupy job URL: ")
     job_data = fetch_gupy_job(url)
-    print(json.dumps(job_data, indent=2, ensure_ascii=False))
+    cleaned_data = clean_job_data(job_data)
+    print(json.dumps(cleaned_data, indent=2, ensure_ascii=False))
