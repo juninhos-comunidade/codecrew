@@ -2,6 +2,7 @@ import requests
 import json
 import re
 
+# Coleta os dados de uma URL da Gupy e retorna um dict com os dados
 def fetch_gupy_job(url: str) -> dict:
     headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
@@ -16,6 +17,7 @@ def fetch_gupy_job(url: str) -> dict:
     else:
         raise ValueError("Data not found in the HTML content")
 
+# Limpa os dados do job e ja retorna o que vamos alimentar a LLM
 def clean_job_data(job: dict) -> dict:
     return {
         "titulo": job.get("name"),
@@ -23,6 +25,7 @@ def clean_job_data(job: dict) -> dict:
         "responsabilidades": job.get("responsibilities"),
     }
 
+# Executa a pipe de coleta e limpeza
 if __name__ == "__main__":
     url =  input("Enter the Gupy job URL: ")
     job_data = fetch_gupy_job(url)
