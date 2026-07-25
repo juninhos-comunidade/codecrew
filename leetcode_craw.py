@@ -18,14 +18,17 @@ questions = Table('questions', metadata,
 )
 metadata.create_all(engine)
 
-def fetch_leetcode(query: str, variables: dict) -> dict:
-    headers = {
+LEETCODE = "https://leetcode.com"
+HEADERS = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
         'Content-Type': 'application/json',
-        'Referer': 'https://leetcode.com',
+        'Referer': LEETCODE,
     }
+
+def fetch_leetcode(query: str, variables: dict) -> dict:
+    headers = HEADERS
     response = requests.post(
-        'https://leetcode.com/graphql',
+        f"{LEETCODE}/graphql",
         json={'query': query, 'variables': variables},
         headers=headers
     )
