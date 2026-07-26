@@ -25,15 +25,18 @@ HEADERS = {
         'Referer': LEETCODE,
     }
 
-def fetch_leetcode(query: str, variables: dict) -> dict:
-    headers = HEADERS
+def fetch_leetcode(query: str, variables: dict) -> dict | None:
+    HEADERS
     response = requests.post(
         f"{LEETCODE}/graphql",
         json={'query': query, 'variables': variables},
-        headers=headers
+        headers=HEADERS
     )
+    time.sleep(0.2)
     if response.status_code == 200:
         return response.json()
+    print("HTTP", response.status_code, response.text[:500])
+    return None
 
 # Lista questoes por filtro
 list_query="""
@@ -49,6 +52,7 @@ query problemList($filters: QuestionListFilterInput, $limit: Int, $skip: Int) {
             title
             titleSlug
             difficulty
+            isPaidOnly
         }
     }
 }
@@ -67,22 +71,45 @@ query getQuestion($titleSlug: String!) {
 }
 """
 
-list_result = fetch_leetcode(list_query, {
-    "filters": {"tags": ["array"], "difficulty": "EASY"},
-    "limit": 50,
-    "skip": 0
-})
+todas = []
+skip = 0
+total = None
 
-questions_list = list_result['data']['problemsetQuestionList']['questions']
-slugs = [q['titleSlug'] for q in questions_list]
+while total is None or skip < total:
+    list_result = fetch_leetcode(list_query, {
+        "filters": {},
+        "limit": 100,
+        "skip": skip,
+    })
+
+    if list_result is None:
+        print("falha na pagina", skip)
+        break
+
+    bloc = list_result['data']['problemsetQuestionList']
+    total = bloc['total']
+    todas.extend(bloc['questions'])
+    skip += 100
+
+free = [q for q in todas if not q['isPaidOnly']]
+slugs = [q['titleSlug'] for q in free]
 
 for slug in slugs:
     q_result = fetch_leetcode(question_query, {"titleSlug": slug})
+    
+    if q_result is None:
+        print("falha na questao", slug)
+        continue
+
     question = q_result['data']['question']
 
-    if question['content'] is None:
+    if question is None:
+        print("pulando (sem question):", slug)
+        continue
+    
+    if question['content'] is None:  
         print("pulando (sem content):", slug)
-        continue    
+        continue
     
     question['content'] = markdownify(question['content'])
     
@@ -98,4 +125,3 @@ for slug in slugs:
     with engine.begin() as conn:
         conn.execute(stmt)
     print("inserido:", slug)
-    time.sleep(0.5)  # Atraso de 0,5 segundos entre as requisições
