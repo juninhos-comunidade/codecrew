@@ -1,6 +1,18 @@
 import requests
 import json
 import re
+from bs4 import BeautifulSoup
+
+# Limpa os dados do job e ja retorna o que vamos alimentar a LLM
+def clean_html(html):
+    return BeautifulSoup(html, "html.parser").get_text("\n")
+
+def clean_job_data(job: dict) -> dict:
+    return {
+        "titulo": job.get("name"),
+        "pre_requisitos": clean_html(job.get("prerequisites")),
+        "responsabilidades": clean_html(job.get("responsibilities")),
+    }
 
 # Coleta os dados de uma URL da Gupy e retorna um dict com os dados
 def fetch_gupy_job(url: str) -> dict:
@@ -9,21 +21,13 @@ def fetch_gupy_job(url: str) -> dict:
     }
     response = requests.get(url, headers=headers)
     html_content = response.text
-    match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.+?)</script>', html_content, re.DOTALL)
+    match = re.search(r'<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)</script>', html_content, re.DOTALL)
     if match:
         json_data = json.loads(match.group(1))
         job = json_data['props']['pageProps']['job']
         return job
     else:
         raise ValueError("Data not found in the HTML content")
-
-# Limpa os dados do job e ja retorna o que vamos alimentar a LLM
-def clean_job_data(job: dict) -> dict:
-    return {
-        "titulo": job.get("name"),
-        "pre_requisitos": job.get("prerequisites"),
-        "responsabilidades": job.get("responsibilities"),
-    }
 
 # Executa a pipe de coleta e limpeza
 if __name__ == "__main__":
