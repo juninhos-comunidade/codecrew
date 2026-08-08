@@ -1,1 +1,6 @@
 .env
+comandos_uteis.md
+__pycache__/
+*.pyc
+.venv/
+venv/
