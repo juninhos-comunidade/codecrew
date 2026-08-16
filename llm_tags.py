@@ -1,30 +1,37 @@
-import requests
+"""Infer LeetCode topics and difficulty from a normalized job description."""
+
+from __future__ import annotations
+
 import json
-from craw_gupy import fetch_gupy_job, clean_job_data
+import re
+import unicodedata
 
-OLLAMA = "http://localhost:11434/v1/chat/completions"
-MODEL = "qwen2.5:3b"
+from craw_gupy import get_job
+from llm_client import request_json
 
-TAGS = ["array", "string", "hash-table", "two-pointers", "sliding-window", "prefix-sum" ,
-"sorting", "binary-search", "recursion", "math", "greedy", "counting",
-"stack", "queue", "linked-list", "tree", "binary-tree", "graph", "heap-priority-queue", "matrix",
-"dynamic-programming", "backtracking", "depth-first-search", "breadth-first-search",
-"bit-manipulation", "design", "trie", "union-find",
-"database", "concurrency", "simulation", "string-matching"]
+TAGS = [
+    "array", "string", "hash-table", "two-pointers", "sliding-window",
+    "prefix-sum", "sorting", "binary-search", "recursion", "math", "greedy",
+    "counting", "stack", "queue", "linked-list", "tree", "binary-tree",
+    "graph", "heap-priority-queue", "matrix", "dynamic-programming",
+    "backtracking", "depth-first-search", "breadth-first-search",
+    "bit-manipulation", "design", "trie", "union-find", "database",
+    "concurrency", "simulation", "string-matching",
+]
 
 SCHEMA = {
     "type": "object",
     "properties": {
         "tags": {
             "type": "array",
-            "minItems": 2,
-            "maxItems": 3,
-            "items": {"type": "string", "enum": TAGS}
+            "minItems": 3,
+            "maxItems": 5,
+            "items": {"type": "string", "enum": TAGS},
         },
         "difficulty": {"type": "string", "enum": ["Easy", "Medium", "Hard"]},
     },
     "required": ["tags", "difficulty"],
-    "additionalProperties": False
+    "additionalProperties": False,
 }
 
 PROMPT = """
@@ -38,43 +45,82 @@ resolve no dia a dia e traduza isso para os tópicos disponíveis.
 Exemplo: backend com muita manipulação de dados e otimização de consultas
 sugere hash-table, string e array. Não sugere "django" nem "postgresql".
 
-Escolha de 3 a 5 tópicos, e a dificuldade adequada à senioridade da vaga.
+Escolha de 3 a 5 tópicos e a dificuldade adequada à senioridade da vaga.
+Quando houver um diagnóstico do candidato, priorize as lacunas encontradas.
 
 VAGA
 título: {titulo}
 pré-requisitos: {pre_requisitos}
 responsabilidades: {responsabilidades}
+
+DIAGNÓSTICO DO CANDIDATO
+{match}
 """
 
-url = input("Enter the Gupy job URL: ")
+
+def _plain_text(value: str) -> str:
+    return "".join(
+        character
+        for character in unicodedata.normalize("NFKD", value.lower())
+        if not unicodedata.combining(character)
+    )
 
 
-job = clean_job_data(fetch_gupy_job(url))
+def set_difficulty(title: str, suggestion: str) -> str:
+    """Apply deterministic seniority rules over the LLM suggestion."""
+    normalized = _plain_text(title)
+    words = set(re.findall(r"[a-z0-9]+", normalized))
+    junior_terms = {"junior", "jr", "estagiario", "intern", "estagio"}
+    senior_terms = {"senior", "sr", "especialista", "specialist", "lead"}
 
-def set_difficulty(titulo: str, sugest: str) -> str:
-    t = titulo.lower()
-    if any (p in t for p in ("junior", "jr", "estagiario", "intern", "estagio")):
+    if words & junior_terms:
         return "Easy"
-    if any (p in t for p in ("senior", "sr", "especialista", "specialist", "lead")):
+    if words & senior_terms:
         return "Hard"
-    return sugest
+    if suggestion not in {"Easy", "Medium", "Hard"}:
+        raise ValueError(f"Dificuldade inválida retornada pela LLM: {suggestion!r}")
+    return suggestion
 
-def llm_question(prompt:str, schema: dict) -> dict:
-    r = requests.post(OLLAMA, timeout=300, json={
-        "model": MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {"name": "tags_vaga", "schema": schema, "strict": True},
-        },
-        "temperature": 0,
-    })
-    r.raise_for_status()
-    return json.loads(r.json()["choices"][0]["message"]["content"])
 
-response = llm_question(PROMPT.format(**job), SCHEMA)
-response["tags"] = list(dict.fromkeys(response["tags"]))
-difficulty = set_difficulty(job['titulo'], response["difficulty"])
+def llm_question(prompt: str, schema: dict) -> dict:
+    return request_json(
+        messages=[{"role": "user", "content": prompt}],
+        schema=schema,
+        schema_name="tags_vaga",
+    )
 
-print(response["tags"], difficulty)
 
+def analyze_job(job: dict, match: dict | None = None) -> dict:
+    missing = [field for field in ("titulo", "pre_requisitos", "responsabilidades")
+               if field not in job]
+    if missing:
+        raise ValueError(f"Campos ausentes na vaga: {', '.join(missing)}")
+
+    match_context = (
+        json.dumps(match, indent=2, ensure_ascii=False)
+        if match
+        else "Não fornecido. Analise somente a vaga."
+    )
+    response = llm_question(PROMPT.format(**job, match=match_context), SCHEMA)
+    raw_tags = response.get("tags")
+    if not isinstance(raw_tags, list):
+        raise ValueError("A LLM não retornou uma lista de tópicos.")
+
+    tags = list(dict.fromkeys(tag for tag in raw_tags if tag in TAGS))
+    if len(tags) < 3:
+        raise ValueError("A LLM não retornou tópicos válidos suficientes.")
+
+    return {
+        "tags": tags,
+        "difficulty": set_difficulty(job["titulo"], response.get("difficulty", "")),
+    }
+
+
+def job_analysis(url: str, match: dict | None = None) -> dict:
+    job = get_job(url)
+    return {"job": job, **analyze_job(job, match)}
+
+
+if __name__ == "__main__":
+    job_url = input("URL da vaga na Gupy: ").strip()
+    print(json.dumps(job_analysis(job_url), indent=2, ensure_ascii=False))

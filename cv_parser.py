@@ -1,16 +1,9 @@
+import json
 from pathlib import Path
+
 import pdfplumber
 
-import json
-import os
-
-import requests
-from dotenv import load_dotenv
-
-load_dotenv()
-
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "deepseek/deepseek-v4-flash"
+from llm_client import request_json
 
 SYSTEM_PROMPT = """
 Voce extrai informacoes de curriculos.
@@ -34,11 +27,39 @@ Responda somente em JSON com:
   }
   """
 
+CV_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "nome": {"type": ["string", "null"]},
+        "resumo": {"type": "string"},
+        "habilidades": {"type": "array", "items": {"type": "string"}},
+        "experiencias": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "empresa": {"type": ["string", "null"]},
+                    "cargo": {"type": ["string", "null"]},
+                    "descricao": {"type": "string"},
+                },
+                "required": ["empresa", "cargo", "descricao"],
+                "additionalProperties": False,
+            },
+        },
+        "formacao": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["nome", "resumo", "habilidades", "experiencias", "formacao"],
+    "additionalProperties": False,
+}
+
+
 def parse_cv(pdf_path: str | Path) -> str:
     pdf_path = Path(pdf_path)
 
-    if pdf_path.suffix.lower() != '.pdf':
+    if pdf_path.suffix.lower() != ".pdf":
         raise ValueError(f"The specified file is not a PDF: {pdf_path}")
+    if not pdf_path.is_file():
+        raise FileNotFoundError(f"Currículo não encontrado: {pdf_path}")
 
     pages: list[str] = []
 
@@ -46,7 +67,7 @@ def parse_cv(pdf_path: str | Path) -> str:
         for page in pdf.pages:
             text = page.extract_text()
 
-            if text.strip():
+            if text and text.strip():
                 pages.append(text.strip())
     
     result = '\n\n'.join(pages)
@@ -57,44 +78,21 @@ def parse_cv(pdf_path: str | Path) -> str:
     return result
 
 def analyze_cv(cv_text: str) -> dict:
-    response = requests.post(
-        OPENROUTER_URL,
-        headers={
-            "Authorization": (
-                f"Bearer {os.environ['OPENROUTER_API_KEY']}"
-            ),
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": MODEL,
-            "messages": [
-                {
-                    "role": "system", 
-                    "content": SYSTEM_PROMPT
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        f"<curriculo>\n{cv_text}\n</curriculo>"
-                    )
-                }
-            ],
-            "response_format": {
-                "type": "json_object"
+    if not cv_text.strip():
+        raise ValueError("O texto do currículo está vazio.")
+    return request_json(
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": f"<curriculo>\n{cv_text}\n</curriculo>",
             },
-            "temperature": 0
-        },
-        timeout=60
+        ],
+        schema=CV_SCHEMA,
+        schema_name="curriculo",
     )
 
-    response.raise_for_status()
-    
-    response_data = response.json()
-    content = response_data["choices"][0]["message"]["content"]
-
-    return json.loads(content)
-
-def process_cv(pdf_path: str) -> dict:
+def process_cv(pdf_path: str | Path) -> dict:
     cv_text = parse_cv(pdf_path)
     return analyze_cv(cv_text)
 

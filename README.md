@@ -1,39 +1,24 @@
 # CodeCrew
 
-Preparação personalizada para entrevistas técnicas, guiada por IA e gamificada.
+Preparação personalizada para entrevistas a partir do currículo do candidato e
+de uma vaga real.
 
-## Descrição
+## Fluxo da V1
 
-Se preparar para uma entrevista hoje é um processo genérico: o candidato estuda listas de
-perguntas prontas e resolve exercícios aleatórios, sem saber se aquilo tem relação com a vaga
-que ele realmente quer.
+1. Coleta e normaliza uma vaga publicada na Gupy.
+2. Extrai o texto de um currículo em PDF e o estrutura com IA.
+3. Compara currículo e vaga para encontrar pontos fortes e lacunas.
+4. Usa o diagnóstico para definir tópicos e dificuldade de programação.
+5. Seleciona desafios compatíveis no PostgreSQL.
 
-O CodeCrew parte de dois insumos concretos, o **currículo do candidato** e a **vaga desejada**, 
-e usa inteligência artificial para gerar um roteiro de preparação sob medida:
-
-- **Perguntas técnicas e comportamentais personalizadas**, derivadas dos pré-requisitos e das
-  responsabilidades reais da vaga, cruzadas com a experiência descrita no currículo.
-- **Desafios de código gamificados**, com pontuação e progressão, para que o treino técnico
-  deixe de ser uma lista de tarefas e vire uma experiência com senso de avanço.
-
-A ideia é simples: em vez de estudar "o que costuma cair", o candidato treina exatamente o que
-aquela vaga exige.
-
-### Como funciona
-
-1. **Coleta da vaga** — a partir da URL de uma vaga, extraímos título, pré-requisitos e
-   responsabilidades.
-2. **Análise com IA** — esses dados são cruzados com o currículo do candidato para gerar as
-   perguntas da entrevista.
-3. **Trilha de desafios** — um acervo de questões de lógica alimenta o modo gamificado, filtrado
-   por tema e dificuldade conforme o perfil da vaga.
-
-Este repositório contém a **camada de coleta de dados** que alimenta as etapas 1 e 3.
+As interações de IA usam o OpenRouter com o modelo
+`deepseek/deepseek-v4-flash` por padrão.
 
 ## Requisitos
 
 - Python 3.12+
-- PostgreSQL
+- PostgreSQL com a tabela `questions` carregada
+- Chave de API do OpenRouter
 
 ## Instalação
 
@@ -41,65 +26,75 @@ Este repositório contém a **camada de coleta de dados** que alimenta as etapas
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env
 ```
 
-Crie um arquivo `.env` na raiz do projeto:
+Preencha o `.env`:
 
 ```env
+OPENROUTER_API_KEY=coloque_sua_chave_aqui
+OPENROUTER_MODEL=deepseek/deepseek-v4-flash
 DATABASE_URL=postgresql+psycopg2://usuario:senha@localhost:5432/codecrew
 ```
 
-## Uso
+## Carregar o banco de desafios
 
-### Coletar uma vaga
-
-```bash
-python craw_gupy.py
-```
-
-O script pede a URL da vaga e devolve os campos usados como contexto para a IA:
-
-```json
-{
-  "titulo": "Desenvolvedor(a) Python Pleno",
-  "pre_requisitos": "Experiência com Python, SQL e APIs REST...",
-  "responsabilidades": "Desenvolver e manter serviços backend..."
-}
-```
-
-### Popular o acervo de desafios
+O coletor do LeetCode é um utilitário independente, usado somente para criar e
+popular a tabela `questions`:
 
 ```bash
 python leetcode_craw.py
 ```
 
-Busca as questões, converte os enunciados para Markdown e grava na tabela `questions`.
-A inserção é idempotente, então rodar de novo não duplica registros.
+Ele não faz parte do fluxo executado para cada candidato.
 
-Os filtros de coleta (tema, dificuldade e quantidade) ficam no próprio script:
+## Executar o fluxo completo
 
-```python
-list_result = fetch_leetcode(list_query, {
-    "filters": {"tags": ["array"], "difficulty": "EASY"},
-    "limit": 50,
-    "skip": 0
-})
+```bash
+python preparation_service.py \
+  "https://empresa.gupy.io/jobs/123456" \
+  --cv "./curriculo.pdf" \
+  --limit 10
 ```
 
-## Roadmap
+O resultado é um JSON com este formato:
 
-- [ ] Upload e parsing do currículo
-- [ ] Geração das perguntas de entrevista com IA
-- [ ] Motor de pontuação e progressão dos desafios
-- [ ] Interface web
+```json
+{
+  "job": {},
+  "candidate": {},
+  "match": {
+    "aderencia": 75,
+    "resumo": "...",
+    "pontos_fortes": [],
+    "lacunas": [],
+    "focos_de_preparacao": []
+  },
+  "algorithm_profile": {
+    "tags": ["array", "hash-table", "string"],
+    "difficulty": "Medium"
+  },
+  "questions": []
+}
+```
 
-## Status do projeto
+## Módulos
 
-Em desenvolvimento. A camada de coleta de dados já está funcional; as etapas de análise por IA
-e a interface ainda estão sendo construídas.
+- `craw_gupy.py`: coleta e normalização da vaga.
+- `cv_parser.py`: extração e estruturação do currículo.
+- `profile_matcher.py`: diagnóstico entre candidato e vaga.
+- `llm_tags.py`: perfil de desafios orientado pelas lacunas do match.
+- `preparation_service.py`: orquestração do fluxo completo.
+- `llm_client.py`: comunicação estruturada com o OpenRouter.
+- `leetcode_craw.py`: carga independente do acervo de desafios.
+
+## Limites atuais
+
+- A coleta automática aceita vagas da Gupy.
+- O currículo precisa ser um PDF com texto selecionável; não há OCR.
+- O banco de desafios deve ser carregado antes da execução.
+- Interface e gamificação ficam para a próxima fase do MVP.
 
 ## Autores
 
-Rodrigo Rodrigues,
-Joao Schramm e
-Augusto Krause.
+Rodrigo Rodrigues, Joao Schramm e Augusto Krause.
