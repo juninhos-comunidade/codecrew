@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 
 DEFAULT_TIMEOUT = 30
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class GupyJobError(RuntimeError):
@@ -14,10 +15,11 @@ class GupyJobError(RuntimeError):
 def clean_html(html: str | None) -> str:
     if not html:
         return ""
-    return BeautifulSoup(
+    text = BeautifulSoup(
         html,
         "html.parser"
     ).get_text(separator=" ", strip=True)
+    return text.replace("\ufeff", "").strip()
 
 def _validate_url(url: str) -> None:
     parsed = urlparse(url)
@@ -34,7 +36,16 @@ def fetch_gupy_job(url: str, timeout: float = DEFAULT_TIMEOUT) -> dict:
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
         )
     }
-    response = requests.get(url, headers=headers, timeout=timeout)
+    for attempt in range(2):
+        try:
+            response = requests.get(url, headers=headers, timeout=timeout)
+        except requests.ConnectionError:
+            if attempt == 1:
+                raise
+            continue
+        if response.status_code not in RETRYABLE_STATUS_CODES or attempt == 1:
+            break
+        response.close()
     response.raise_for_status()
 
     script = BeautifulSoup(response.text, "html.parser").find(

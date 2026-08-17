@@ -12,10 +12,10 @@ from sqlalchemy import Integer, String, bindparam, create_engine, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.engine import Engine
 
-from craw_gupy import get_job
-from cv_parser import process_cv
-from llm_tags import analyze_job
-from profile_matcher import analyze_match
+from backend.app.integrations.gupy import get_job
+from backend.app.services.algorithm_profile import analyze_job
+from backend.app.services.cv_parser import process_cv
+from backend.app.services.profile_matcher import analyze_match
 
 
 load_dotenv()

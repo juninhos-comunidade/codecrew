@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pdfplumber
 
-from llm_client import request_json
+from backend.app.integrations.openrouter import request_json
 
 SYSTEM_PROMPT = """
 Voce extrai informacoes de curriculos.

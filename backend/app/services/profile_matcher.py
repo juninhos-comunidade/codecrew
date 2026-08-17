@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from llm_client import request_json
+from backend.app.integrations.openrouter import request_json
 
 MATCH_SCHEMA = {
     "type": "object",

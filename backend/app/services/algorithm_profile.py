@@ -6,8 +6,8 @@ import json
 import re
 import unicodedata
 
-from craw_gupy import get_job
-from llm_client import request_json
+from backend.app.integrations.gupy import get_job
+from backend.app.integrations.openrouter import request_json
 
 TAGS = [
     "array", "string", "hash-table", "two-pointers", "sliding-window",

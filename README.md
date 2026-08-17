@@ -25,7 +25,7 @@ As interações de IA usam o OpenRouter com o modelo
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 cp .env.example .env
 ```
 
@@ -34,8 +34,13 @@ Preencha o `.env`:
 ```env
 OPENROUTER_API_KEY=coloque_sua_chave_aqui
 OPENROUTER_MODEL=deepseek/deepseek-v4-flash
-DATABASE_URL=postgresql+psycopg2://usuario:senha@localhost:5432/codecrew
+DATABASE_URL=postgresql+psycopg2://postgres.PROJECT_REF:SENHA@aws-0-REGIAO.pooler.supabase.com:5432/postgres
 ```
+
+Para executar com Docker em uma rede sem IPv6, use a conexão `Session pooler`
+do Supabase, disponível em `Connect > Session pooler`. A conexão direta
+`db.PROJECT_REF.supabase.co:5432` usa IPv6 por padrão e pode não funcionar na
+rede interna do Docker.
 
 ## Carregar o banco de desafios
 
@@ -43,7 +48,7 @@ O coletor do LeetCode é um utilitário independente, usado somente para criar e
 popular a tabela `questions`:
 
 ```bash
-python leetcode_craw.py
+python -m backend.scripts.load_leetcode
 ```
 
 Ele não faz parte do fluxo executado para cada candidato.
@@ -51,7 +56,7 @@ Ele não faz parte do fluxo executado para cada candidato.
 ## Executar o fluxo completo
 
 ```bash
-python preparation_service.py \
+python -m backend.app.services.pipeline \
   "https://empresa.gupy.io/jobs/123456" \
   --cv "./curriculo.pdf" \
   --limit 10
@@ -78,22 +83,66 @@ O resultado é um JSON com este formato:
 }
 ```
 
-## Módulos
+## Executar a demo
 
-- `craw_gupy.py`: coleta e normalização da vaga.
-- `cv_parser.py`: extração e estruturação do currículo.
-- `profile_matcher.py`: diagnóstico entre candidato e vaga.
-- `llm_tags.py`: perfil de desafios orientado pelas lacunas do match.
-- `preparation_service.py`: orquestração do fluxo completo.
-- `llm_client.py`: comunicação estruturada com o OpenRouter.
-- `leetcode_craw.py`: carga independente do acervo de desafios.
+Com Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+No Ubuntu, caso o subcomando `docker compose` não esteja disponível:
+
+```bash
+sudo apt install docker-compose-v2
+```
+
+Abra `http://localhost:5173`. A API também fica disponível em
+`http://localhost:8000/docs`.
+
+Para executar sem Docker, inicie a API na raiz do repositório:
+
+```bash
+source .venv/bin/activate
+uvicorn backend.app.main:app --reload
+```
+
+Em outro terminal, inicie a interface:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Abra `http://localhost:5173`, informe a URL pública de uma vaga da Gupy e
+selecione um currículo em PDF.
+
+## Estrutura
+
+```text
+backend/
+├── app/
+│   ├── api/           # rotas HTTP e dependências
+│   ├── integrations/  # Gupy e OpenRouter
+│   ├── repositories/  # armazenamento das sessões
+│   ├── schemas/       # contratos de entrada e saída
+│   └── services/      # análise, preparação e mentor
+├── scripts/           # utilitários operacionais
+└── requirements.txt
+frontend/              # interface React/Vite
+```
+
+O carregador do catálogo do LeetCode fica em
+`backend/scripts/load_leetcode.py`. A orquestração do fluxo fica em
+`backend/app/services/pipeline.py`.
 
 ## Limites atuais
 
 - A coleta automática aceita vagas da Gupy.
 - O currículo precisa ser um PDF com texto selecionável; não há OCR.
 - O banco de desafios deve ser carregado antes da execução.
-- Interface e gamificação ficam para a próxima fase do MVP.
+- As sessões ficam em memória e são perdidas ao reiniciar a API.
 
 ## Autores
 
