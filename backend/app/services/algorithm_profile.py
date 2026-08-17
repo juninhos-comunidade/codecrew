@@ -1,13 +1,9 @@
-"""Infer LeetCode topics and difficulty from a normalized job description."""
-
-from __future__ import annotations
-
 import json
 import re
 import unicodedata
 
-from craw_gupy import get_job
-from llm_client import request_json
+from backend.app.integrations.gupy import get_job
+from backend.app.integrations.openrouter import request_json
 
 TAGS = [
     "array", "string", "hash-table", "two-pointers", "sliding-window",
@@ -67,7 +63,6 @@ def _plain_text(value: str) -> str:
 
 
 def set_difficulty(title: str, suggestion: str) -> str:
-    """Apply deterministic seniority rules over the LLM suggestion."""
     normalized = _plain_text(title)
     words = set(re.findall(r"[a-z0-9]+", normalized))
     junior_terms = {"junior", "jr", "estagiario", "intern", "estagio"}

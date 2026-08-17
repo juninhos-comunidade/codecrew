@@ -6,6 +6,7 @@ Na raiz do repositório:
 
 ```bash
 source .venv/bin/activate
+pip install -r backend/requirements.txt
 uvicorn backend.app.main:app --reload
 ```
 
@@ -21,6 +22,7 @@ http://127.0.0.1:8000/docs
 GET  /api/v1/health
 POST /api/v1/preparations
 GET  /api/v1/preparations/{session_id}
+POST /api/v1/preparations/{session_id}/messages
 ```
 
 O endpoint de criação recebe `multipart/form-data` com:
@@ -40,3 +42,9 @@ curl -X POST http://127.0.0.1:8000/api/v1/preparations \
 
 As preparações ficam em memória e são removidas quando o servidor reinicia. O
 PDF é usado por meio de um arquivo temporário e removido ao final da requisição.
+
+O endpoint de mensagens recebe o histórico recente da conversa e usa o
+diagnóstico salvo na sessão como contexto do mentor.
+
+Em Docker, configure `DATABASE_URL` com a URL `Session pooler` IPv4 do
+Supabase, na porta 5432. A URL direta do projeto depende de conectividade IPv6.

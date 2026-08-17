@@ -8,7 +8,7 @@ from fastapi import APIRouter, File, Form, UploadFile, status
 
 from backend.app.api.dependencies import PreparationServiceDependency
 from backend.app.exceptions import InvalidPreparationInputError
-from backend.app.schemas import PreparationSession
+from backend.app.schemas import MentorRequest, MentorResponse, PreparationSession
 
 
 router = APIRouter(prefix="/preparations", tags=["preparations"])
@@ -49,3 +49,13 @@ def get_preparation(
     service: PreparationServiceDependency,
 ) -> PreparationSession:
     return service.get(session_id)
+
+
+@router.post("/{session_id}/messages", response_model=MentorResponse)
+def create_mentor_message(
+    session_id: UUID,
+    payload: MentorRequest,
+    service: PreparationServiceDependency,
+) -> MentorResponse:
+    messages = [message.model_dump() for message in payload.messages]
+    return MentorResponse(message=service.reply(session_id, messages))

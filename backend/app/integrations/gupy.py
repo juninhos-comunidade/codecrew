@@ -6,18 +6,19 @@ from bs4 import BeautifulSoup
 
 
 DEFAULT_TIMEOUT = 30
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class GupyJobError(RuntimeError):
-    """Raised when a Gupy job cannot be downloaded or parsed."""
+    pass
+
 
 def clean_html(html: str | None) -> str:
     if not html:
         return ""
-    return BeautifulSoup(
-        html,
-        "html.parser"
-    ).get_text(separator=" ", strip=True)
+    text = BeautifulSoup(html, "html.parser").get_text(separator=" ", strip=True)
+    return text.replace("\ufeff", "").strip()
+
 
 def _validate_url(url: str) -> None:
     parsed = urlparse(url)
@@ -25,7 +26,6 @@ def _validate_url(url: str) -> None:
         raise ValueError("Informe uma URL HTTP(S) válida para a vaga.")
 
 
-# Coleta os dados de uma URL da Gupy e retorna um dict com os dados
 def fetch_gupy_job(url: str, timeout: float = DEFAULT_TIMEOUT) -> dict:
     _validate_url(url)
     headers = {
@@ -34,7 +34,16 @@ def fetch_gupy_job(url: str, timeout: float = DEFAULT_TIMEOUT) -> dict:
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
         )
     }
-    response = requests.get(url, headers=headers, timeout=timeout)
+    for attempt in range(2):
+        try:
+            response = requests.get(url, headers=headers, timeout=timeout)
+        except requests.ConnectionError:
+            if attempt == 1:
+                raise
+            continue
+        if response.status_code not in RETRYABLE_STATUS_CODES or attempt == 1:
+            break
+        response.close()
     response.raise_for_status()
 
     script = BeautifulSoup(response.text, "html.parser").find(
@@ -53,7 +62,6 @@ def fetch_gupy_job(url: str, timeout: float = DEFAULT_TIMEOUT) -> dict:
         raise GupyJobError("Os dados encontrados para a vaga são inválidos.")
     return job
 
-# Limpa os dados do job e ja retorna o que vamos alimentar a LLM
 def clean_job_data(job: dict) -> dict:
     cleaned = {
         "titulo": clean_html(job.get("name")),
@@ -66,10 +74,4 @@ def clean_job_data(job: dict) -> dict:
 
 
 def get_job(url: str) -> dict:
-    """Download and normalize a job in the format consumed by the LLMs."""
     return clean_job_data(fetch_gupy_job(url))
-
-# Executa a pipe de coleta e limpeza
-if __name__ == "__main__":
-    url = input("URL da vaga na Gupy: ").strip()
-    print(json.dumps(get_job(url), indent=2, ensure_ascii=False))

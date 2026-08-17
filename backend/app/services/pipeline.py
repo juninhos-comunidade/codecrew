@@ -1,7 +1,3 @@
-"""Application service that assembles an interview preparation payload."""
-
-from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -12,10 +8,10 @@ from sqlalchemy import Integer, String, bindparam, create_engine, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.engine import Engine
 
-from craw_gupy import get_job
-from cv_parser import process_cv
-from llm_tags import analyze_job
-from profile_matcher import analyze_match
+from backend.app.integrations.gupy import get_job
+from backend.app.services.algorithm_profile import analyze_job
+from backend.app.services.cv_parser import process_cv
+from backend.app.services.profile_matcher import analyze_match
 
 
 load_dotenv()
@@ -73,7 +69,6 @@ def build_preparation(
     question_limit: int = 10,
     db_engine: Engine | None = None,
 ) -> dict:
-    """Run the MVP pipeline and return a serializable preparation payload."""
     job = get_job(job_url)
     candidate = process_cv(cv_path)
     match = analyze_match(candidate, job)

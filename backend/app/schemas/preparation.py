@@ -65,3 +65,16 @@ class PreparationSession(PreparationData):
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+
+
+class MentorMessage(BaseModel):
+    role: Literal["assistant", "user"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
+class MentorRequest(BaseModel):
+    messages: list[MentorMessage] = Field(min_length=1, max_length=20)
+
+
+class MentorResponse(BaseModel):
+    message: str

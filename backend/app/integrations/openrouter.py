@@ -1,5 +1,3 @@
-"""Cliente JSON do OpenRouter usado pelos módulos do CodeCrew."""
-
 import json
 import os
 
@@ -12,10 +10,11 @@ load_dotenv()
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-v4-flash")
 TIMEOUT = 90
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class LLMResponseError(RuntimeError):
-    """Raised when a provider returns an invalid structured response."""
+    pass
 
 
 def _parse_json_content(content: object) -> dict:
@@ -48,33 +47,44 @@ def request_json(
     schema: dict,
     schema_name: str,
 ) -> dict:
-    """Envia uma conversa e devolve o objeto JSON estruturado pela LLM."""
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("Defina OPENROUTER_API_KEY para usar a IA.")
 
-    response = requests.post(
-        OPENROUTER_URL,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": MODEL,
-            "messages": messages,
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": schema_name,
-                    "schema": schema,
-                    "strict": True,
-                },
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    body = {
+        "model": MODEL,
+        "messages": messages,
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": schema_name,
+                "schema": schema,
+                "strict": True,
             },
-            "temperature": 0,
-            "provider": {"require_parameters": True},
         },
-        timeout=TIMEOUT,
-    )
+        "temperature": 0,
+        "provider": {"require_parameters": True},
+    }
+
+    for attempt in range(2):
+        try:
+            response = requests.post(
+                OPENROUTER_URL,
+                headers=headers,
+                json=body,
+                timeout=TIMEOUT,
+            )
+        except requests.ConnectionError:
+            if attempt == 1:
+                raise
+            continue
+        if response.status_code not in RETRYABLE_STATUS_CODES or attempt == 1:
+            break
+        response.close()
     response.raise_for_status()
 
     try:

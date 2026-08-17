@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from backend.app.repositories import InMemorySessionRepository
-from backend.app.services import PreparationApplicationService
+from backend.app.services.preparation import PreparationApplicationService
 
 
 session_repository = InMemorySessionRepository()
