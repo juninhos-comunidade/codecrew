@@ -1,7 +1,3 @@
-"""Infer LeetCode topics and difficulty from a normalized job description."""
-
-from __future__ import annotations
-
 import json
 import re
 import unicodedata
@@ -67,7 +63,6 @@ def _plain_text(value: str) -> str:
 
 
 def set_difficulty(title: str, suggestion: str) -> str:
-    """Apply deterministic seniority rules over the LLM suggestion."""
     normalized = _plain_text(title)
     words = set(re.findall(r"[a-z0-9]+", normalized))
     junior_terms = {"junior", "jr", "estagiario", "intern", "estagio"}

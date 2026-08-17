@@ -1,1 +1,0 @@
-"""CodeCrew API application package."""

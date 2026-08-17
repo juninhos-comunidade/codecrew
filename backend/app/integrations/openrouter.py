@@ -1,5 +1,3 @@
-"""Cliente JSON do OpenRouter usado pelos módulos do CodeCrew."""
-
 import json
 import os
 
@@ -16,7 +14,7 @@ RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 class LLMResponseError(RuntimeError):
-    """Raised when a provider returns an invalid structured response."""
+    pass
 
 
 def _parse_json_content(content: object) -> dict:
@@ -49,7 +47,6 @@ def request_json(
     schema: dict,
     schema_name: str,
 ) -> dict:
-    """Envia uma conversa e devolve o objeto JSON estruturado pela LLM."""
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("Defina OPENROUTER_API_KEY para usar a IA.")

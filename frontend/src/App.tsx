@@ -54,7 +54,7 @@ type Submission = { jobUrl: string; cv: File };
 function Brand() {
   return (
     <div className="brand" aria-label="CodeCrew">
-      <span className="brand__mark"><Code2 size={25} strokeWidth={2.6} /></span>
+      <span className="brand__mark"><img src="/codecrew-robot.webp" alt="" /></span>
       <span>CodeCrew</span>
     </div>
   );
@@ -208,6 +208,8 @@ function LoadingScreen({
     }
     if (status !== "pending") return;
 
+    setActiveStep(0);
+
     const interval = window.setInterval(() => {
       setActiveStep((current) => Math.min(current + 1, loadingSteps.length - 2));
     }, 1400);
@@ -221,12 +223,16 @@ function LoadingScreen({
         <h1>{status === "error" ? "Não conseguimos concluir a análise" : "Estamos preparando seu treino"}</h1>
         <p>{status === "error" ? error : "Cruzando a vaga com seu currículo para encontrar o melhor ponto de partida."}</p>
 
-        <div className="progress-card">
-          <div className="progress-line"><span style={{ width: `${activeStep * 25}%` }} /></div>
+        <div
+          className="progress-card"
+          aria-label={status === "error" ? "A análise foi interrompida" : `Etapa ${activeStep + 1} de ${loadingSteps.length}: ${loadingSteps[activeStep].label}`}
+          aria-live="polite"
+        >
+          <div className="progress-line" aria-hidden="true"><span style={{ width: `${activeStep * 25}%` }} /></div>
           {loadingSteps.map((step, index) => {
             const Icon = step.icon;
             const completed = index < activeStep;
-            const active = index === activeStep;
+            const active = status !== "error" && index === activeStep;
             return (
               <div className={`progress-step ${completed ? "is-complete" : ""} ${active ? "is-active" : ""}`} key={step.label}>
                 <span className="progress-step__icon">{completed ? <Check size={21} /> : <Icon size={21} />}</span>
@@ -246,7 +252,10 @@ function LoadingScreen({
             <button className="secondary-button" type="button" onClick={onBack}><ArrowLeft size={18} />Revisar dados</button>
           </div>
         ) : (
-          <p className="loading-note">Sua preparação aparecerá automaticamente.</p>
+          <p className="loading-note">
+            Sua preparação aparecerá automaticamente
+            <span className="loading-dots" aria-hidden="true"><i /><i /><i /></span>
+          </p>
         )}
       </section>
     </main>
@@ -401,7 +410,7 @@ function StoriesScreen({ preparation, onComplete }: { preparation: Preparation; 
 }
 
 function MentorIcon() {
-  return <span className="mentor-icon"><Code2 size={20} /></span>;
+  return <span className="mentor-icon"><img src="/codecrew-robot.webp" alt="" /></span>;
 }
 
 function ChatPanel({ preparation }: { preparation: Preparation }) {
@@ -446,7 +455,7 @@ function ChatPanel({ preparation }: { preparation: Preparation }) {
 
   return (
     <section className="chat-panel">
-      <div className="chat-header"><MentorIcon /><strong>Mentor CodeCrew</strong></div>
+      <div className="chat-header"><MentorIcon /><strong>Crew</strong></div>
       <div className="messages">
         {messages.map((message, index) => (
           <div className={`message-row message-row--${message.role}`} key={`${message.role}-${index}`}>

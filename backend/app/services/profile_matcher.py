@@ -1,7 +1,3 @@
-"""Compare a parsed candidate profile with a normalized job description."""
-
-from __future__ import annotations
-
 import json
 
 from backend.app.integrations.openrouter import request_json

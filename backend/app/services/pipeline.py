@@ -1,7 +1,3 @@
-"""Application service that assembles an interview preparation payload."""
-
-from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -73,7 +69,6 @@ def build_preparation(
     question_limit: int = 10,
     db_engine: Engine | None = None,
 ) -> dict:
-    """Run the MVP pipeline and return a serializable preparation payload."""
     job = get_job(job_url)
     candidate = process_cv(cv_path)
     match = analyze_match(candidate, job)

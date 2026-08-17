@@ -1,1 +1,0 @@
-"""CodeCrew backend package."""

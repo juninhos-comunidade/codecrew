@@ -1,5 +1,3 @@
-"""Load public LeetCode questions into the configured PostgreSQL database."""
-
 import os
 import time
 
